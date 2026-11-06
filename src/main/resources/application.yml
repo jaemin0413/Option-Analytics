@@ -1,0 +1,79 @@
+spring:
+  profiles:
+    active: dev
+
+  application:
+    name: option
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+
+# 타임아웃 설정
+  http:
+    client:
+      factory: simple
+      connect-timeout: 10s
+      read-timeout: 60s
+
+  task:
+    scheduling:
+      pool:
+        size: 2
+
+management:
+  server:
+    # 메트릭용 포트
+    port: 8081
+  endpoints:
+    web:
+      exposure:
+        include: health, info, prometheus, metrics
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+
+scheduling:
+  enabled: ${OPTION_SCHEDULING_ENABLED:true}
+
+jwt:
+  secret: ${JWT_SECRET:}
+  access-token-validity: 30m
+  refresh-token-validity: 14d
+
+alpaca:
+  key-id: ${APCA_API_KEY_ID:}
+  secret-key: ${APCA_API_SECRET_KEY:}
+  # 분당 200한도
+  min-call-interval: 300ms
+
+fred:
+  api-key: ${FRED_API_KEY:}
+
+finnhub:
+  api-key: ${FINNHUB_API_KEY:}
+
+storage:
+  raw-dir: ${OPTION_RAW_DIR:./data/raw}
+  trades-dir: ${OPTION_TRADES_DIR:./data/trades}
+  # 디스크 용량 확보용
+  stop-background-free-ratio: 0.20
+  stop-collection-free-ratio: 0.10
+  min-free-bytes: 2147483648
+
+job:
+  lease: 10m
+  trade-time-budget: 6h
+  backfill-start: 2024-01-01
+  backfill-expiration-start: 2024-02-01
+
+universe:
+  only: ${OPTION_UNIVERSE_ONLY:}
+  trade-symbols: SPY, QQQ
+  backfill-symbols: SPY, QQQ
