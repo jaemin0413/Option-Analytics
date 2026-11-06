@@ -1,11 +1,8 @@
 package com.option.domain.collection.entity
 
-import com.option.domain.collection.vo.JobType
 import com.option.global.common.BaseEntity
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
-import jakarta.persistence.EnumType
-import jakarta.persistence.Enumerated
 import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
@@ -22,9 +19,8 @@ class RawFile(
     @Column(name = "raw_file_id")
     val rawFileId: Long? = null,
 
-    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    val job: JobType,
+    val job: String,
 
     @Column(name = "session_date", nullable = false)
     val sessionDate: LocalDate,
