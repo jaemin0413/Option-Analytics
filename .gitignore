@@ -6,3 +6,5 @@ build/
 .kotlin/
 .env
 data/
+
+src/test/
