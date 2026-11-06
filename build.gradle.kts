@@ -40,8 +40,6 @@ dependencies {
 
     // db
     runtimeOnly("org.postgresql:postgresql")
-    implementation("org.flywaydb:flyway-core")
-    implementation("org.flywaydb:flyway-database-postgresql")
 
     // 엑셀 파싱
     implementation("org.apache.poi:poi-ooxml:5.4.1")
