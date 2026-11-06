@@ -4,7 +4,6 @@ import org.springframework.boot.context.properties.ConfigurationProperties
 
 @ConfigurationProperties("universe")
 data class UniverseProperties(
-    val tradeSymbols: List<String>,
     val backfillSymbols: List<String>,
     // 이거 빼면 S&P 500과 아래 ETF 전부 수집
     val only: List<String> = emptyList(),

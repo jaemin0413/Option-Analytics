@@ -33,7 +33,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health, info, prometheus, metrics
+        include: health, info, prometheus, metrics, jobs
   metrics:
     distribution:
       percentiles-histogram:
@@ -61,19 +61,15 @@ finnhub:
 
 storage:
   raw-dir: ${OPTION_RAW_DIR:./data/raw}
-  trades-dir: ${OPTION_TRADES_DIR:./data/trades}
   # 디스크 용량 확보용
   stop-background-free-ratio: 0.20
   stop-collection-free-ratio: 0.10
   min-free-bytes: 2147483648
 
 job:
-  lease: 10m
-  trade-time-budget: 6h
   backfill-start: 2024-01-01
   backfill-expiration-start: 2024-02-01
 
 universe:
   only: ${OPTION_UNIVERSE_ONLY:}
-  trade-symbols: SPY, QQQ
   backfill-symbols: SPY, QQQ
