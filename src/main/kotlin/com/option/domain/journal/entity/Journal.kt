@@ -10,19 +10,18 @@ import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
 import jakarta.persistence.Table
-import jakarta.persistence.UniqueConstraint
 import java.time.LocalDate
 
-// 옵션 보고 상방하방 맞추는 용도, 종목당 하나
+// 옵션 보고 상방하방 맞추는 용도
 @Entity
-@Table(
-    name = "journal_entry",
-    uniqueConstraints = [UniqueConstraint(name = "uk_journal", columnNames = ["symbol", "target_session"])],
-)
-class JournalEntry(
+@Table(name = "journal")
+class Journal(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     val id: Long? = null,
+
+    @Column(name = "user_id", nullable = false)
+    val userId: Long,
 
     @Column(nullable = false)
     val symbol: String,
