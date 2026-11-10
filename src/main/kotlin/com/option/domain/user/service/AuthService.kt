@@ -1,5 +1,6 @@
 package com.option.domain.user.service
 
+import com.option.domain.journal.repository.JournalRepository
 import com.option.domain.user.dto.request.LoginRequest
 import com.option.domain.user.dto.request.ReissueRequest
 import com.option.domain.user.dto.request.SignUpRequest
@@ -19,6 +20,7 @@ class AuthService(
     private val userRepository: UserRepository,
     private val passwordEncoder: PasswordEncoder,
     private val jwtTokenProvider: JwtTokenProvider,
+    private val journalRepository: JournalRepository,
 ) {
     // 회원가입
     @Transactional
@@ -51,6 +53,7 @@ class AuthService(
     @Transactional
     fun withdraw(userId: Long) {
         val user = userRepository.findByIdOrNull(userId) ?: throw BusinessException(AuthErrorCode.USER_NOT_FOUND)
+        journalRepository.deleteByUserId(userId)
         userRepository.delete(user)
     }
 

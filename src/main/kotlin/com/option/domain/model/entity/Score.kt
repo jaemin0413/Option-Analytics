@@ -26,6 +26,10 @@ class Score(
     @Column(name = "publication_id")
     val publicationId: Long?,
 
+    // 사용자 확인용
+    @Column(name = "user_id")
+    val userId: Long? = null,
+
     @Column(nullable = false)
     val symbol: String,
 
