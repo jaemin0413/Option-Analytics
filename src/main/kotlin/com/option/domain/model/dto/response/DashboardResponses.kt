@@ -46,8 +46,8 @@ data class ConcentrationResponse(
 )
 
 data class GexResponse(
-    val day: Double?,
-    val week: Double?,
+    val weekly: Double?,
+    val monthly: Double?,
     val allExpiries: Double?,
     val regime: String,
     val official: Boolean,
@@ -121,12 +121,12 @@ data class TickerMetricResponse(
                 putWall = metric.monthlyPutWallStrike,
             ),
             gex = GexResponse(
-                day = metric.gexDay,
-                week = metric.gexWeek,
+                weekly = metric.gexWeekly,
+                monthly = metric.gexMonthly,
                 allExpiries = metric.gexAll,
                 regime = when {
-                    metric.gexDay == null -> "NO_DATA"
-                    metric.gexDay >= 0 -> "DAMPENING"
+                    metric.gexWeekly == null -> "NO_DATA"
+                    metric.gexWeekly >= 0 -> "DAMPENING"
                     else -> "AMPLIFYING"
                 },
                 official = metric.gexOfficial,
