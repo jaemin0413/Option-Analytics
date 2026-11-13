@@ -105,11 +105,11 @@ class TickerDailyMetric(
     @Column(name = "monthly_put_wall_strike")
     val monthlyPutWallStrike: Double? = null,
 
-    @Column(name = "gex_day")
-    val gexDay: Double? = null,
+    @Column(name = "gex_weekly")
+    val gexWeekly: Double? = null,
 
-    @Column(name = "gex_week")
-    val gexWeek: Double? = null,
+    @Column(name = "gex_monthly")
+    val gexMonthly: Double? = null,
 
     @Column(name = "gex_all")
     val gexAll: Double? = null,
