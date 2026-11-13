@@ -15,4 +15,7 @@ class TradingCalendarService(
 
     // 그 세션의 정규장 시작 시각을 찾는다.
     fun openAt(session: LocalDate): Instant? = marketSessionRepository.findById(session).orElse(null)?.openAt
+
+    // 그 세션의 정규장 마감 시각을 찾는다.
+    fun closeAt(session: LocalDate): Instant? = marketSessionRepository.findById(session).orElse(null)?.closeAt
 }

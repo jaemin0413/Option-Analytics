@@ -33,7 +33,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health, info, prometheus, metrics, jobs
+        include: health, info, prometheus, metrics, jobs, publish
   metrics:
     distribution:
       percentiles-histogram:
