@@ -17,6 +17,7 @@ import java.net.http.HttpTimeoutException
 import java.time.Clock
 import java.time.Duration
 import java.time.LocalDate
+import java.util.concurrent.atomic.AtomicInteger
 
 // 작업 돌리는 코드
 @Service
@@ -28,11 +29,15 @@ class JobRunner(
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
+    // 지금 도는 작업 수다. 배포 스크립트가 이 값이 0일 때만 앱을 재시작한다.
+    private val running = meterRegistry.gauge("option.job.running", AtomicInteger(0))!!
+
     fun start(job: Job, session: LocalDate): RunContext = RunContext(job, session, clock.instant())
 
     // 작업 돌리고 로깅
     fun execute(context: RunContext, body: (RunContext) -> Unit = context.job::run) {
         val sample = meterRegistry.timer("option.job", "job", context.job.name)
+        running.incrementAndGet()
         try {
             if (diskGuard.isTooLow(context.job)) {
                 recordFailure(context, "DISK", FailureCategory.DISK, "디스크 여유 부족으로 시작하지 않음")
@@ -43,6 +48,7 @@ class JobRunner(
             recordFailure(context, "JOB", classify(e), e.message)
             logger.error("job={} session={} 실패", context.job.name, context.session, e)
         } finally {
+            running.decrementAndGet()
             sample.record(Duration.between(context.startedAt, clock.instant()))
             logger.info(
                 "job={} session={} ok={} failed={} rows={} stoppedEarly={} {}",
