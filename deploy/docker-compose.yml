@@ -1,0 +1,44 @@
+services:
+  app:
+    image: ${OPTION_IMAGE:?}
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      PROD_DB_URL: ${PROD_DB_URL}
+      PROD_DB_USERNAME: ${PROD_DB_USERNAME}
+      PROD_DB_PASSWORD: ${PROD_DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      APCA_API_KEY_ID: ${APCA_API_KEY_ID}
+      APCA_API_SECRET_KEY: ${APCA_API_SECRET_KEY}
+      FRED_API_KEY: ${FRED_API_KEY:-}
+      FINNHUB_API_KEY: ${FINNHUB_API_KEY:-}
+      OPTION_UNIVERSE_ONLY: ${OPTION_UNIVERSE_ONLY:-}
+      OPTION_RAW_DIR: /data/raw
+      JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError"
+    volumes:
+      - option-data:/data
+      - option-raw:/data/raw
+    ports:
+      - "${APP_BIND_ADDR:-127.0.0.1}:8090:8080"
+      - "${APP_BIND_ADDR:-127.0.0.1}:8091:8081"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8081/actuator/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 30
+      start_period: 30s
+    mem_limit: 3g
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  option-data:
+  option-raw:
+    driver: local
+    driver_opts:
+      type: nfs
+      o: "addr=${DATA2_ADDR:?},nfsvers=4,rw"
+      device: ":${DATA2_RAW_PATH:?}"
