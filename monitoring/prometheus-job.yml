@@ -2,4 +2,4 @@
   metrics_path: /actuator/prometheus
   scrape_interval: 30s
   static_configs:
-    - targets: ["<apps Tailscale IP>:8091"]
+    - targets: ["100.66.12.112:8091"]

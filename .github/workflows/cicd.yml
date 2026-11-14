@@ -75,9 +75,8 @@ jobs:
           audience: ${{ secrets.TS_AUDIENCE }}
           tags: tag:option-ci
 
-      # deploy 폴더(compose)를 묶어서 넘긴다. .env는 서버에만 있다.
-      - name: Pack deploy folder
-        run: echo "DEPLOY_TAR=$(tar -czf - -C deploy . | base64 -w 0)" >> "$GITHUB_ENV"
+      - name: Pack compose file
+        run: echo "COMPOSE_B64=$(base64 -w 0 docker-compose.yml)" >> "$GITHUB_ENV"
 
       - name: Deploy
         uses: appleboy/ssh-action@v1.2.5
@@ -93,7 +92,7 @@ jobs:
           fingerprint: ${{ vars.DEPLOY_SSH_FINGERPRINT }}
           timeout: 30s
           command_timeout: 12m
-          envs: DEPLOY_DIR,DEPLOY_TAR,OPTION_IMAGE,DOCKERHUB_USERNAME,DOCKERHUB_TOKEN
+          envs: DEPLOY_DIR,COMPOSE_B64,OPTION_IMAGE,DOCKERHUB_USERNAME,DOCKERHUB_TOKEN
           script: |
             bash -se <<'DEPLOY'
             set -euo pipefail
@@ -112,7 +111,7 @@ jobs:
               fi
             fi
 
-            printf '%s' "$DEPLOY_TAR" | base64 --decode | tar -xzf -
+            printf '%s' "$COMPOSE_B64" | base64 --decode > docker-compose.yml
             printf 'OPTION_IMAGE=%s\n' "$OPTION_IMAGE" > image.env
 
             export DOCKER_CONFIG
