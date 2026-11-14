@@ -1,0 +1,124 @@
+name: CI/CD
+
+on:
+  pull_request:
+    branches: [dev, main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: option-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # jar 빌드, main이면 이미지까지 올린다
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      # 테스트 코드는 저장소에 없어서 지금은 컴파일 검사까지만 된다
+      - name: Build jar
+        run: |
+          ./gradlew test bootJar --no-daemon
+          test -s build/libs/option.jar
+
+      - name: Set up Docker Buildx
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        uses: docker/setup-buildx-action@v4
+
+      - name: Login to Docker Hub
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push image
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/option:sha-${{ github.sha }}
+
+  # 홈서버 배포, 작업이 돌고 있으면 배포하지 않는다
+  deploy:
+    name: Deploy to Home Server
+    needs: build
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v4
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          audience: ${{ secrets.TS_AUDIENCE }}
+          tags: tag:option-ci
+
+      - name: Pack compose file
+        run: echo "COMPOSE_B64=$(base64 -w 0 docker-compose.yml)" >> "$GITHUB_ENV"
+
+      - name: Deploy
+        uses: appleboy/ssh-action@v1.2.5
+        env:
+          OPTION_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/option:sha-${{ github.sha }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        with:
+          host: 100.66.12.112
+          username: promevious
+          key: ${{ secrets.OPTION_SSH_PRIVATE_KEY }}
+          fingerprint: SHA256:fhMly2/oBnITaDynCpQJEFuT1oBpzpJmggxRvPnjYTM
+          timeout: 30s
+          command_timeout: 12m
+          envs: COMPOSE_B64,OPTION_IMAGE,DOCKERHUB_USERNAME,DOCKERHUB_TOKEN
+          script: |
+            bash -se <<'DEPLOY'
+            set -euo pipefail
+            cd /home/promevious/services/apps/option
+            test -s .env || { echo ".env가 없습니다"; exit 1; }
+            compose() { docker compose --env-file .env --env-file image.env "$@"; }
+
+            # 앱이 떠 있고 수집, 계산 작업이 돌고 있으면 재시작하지 않는다. 끝난 뒤 다시 실행한다.
+            if [ -s image.env ] && [ -n "$(compose ps -q --status running app)" ]; then
+              body="$(compose exec -T app curl -fsS http://localhost:8081/actuator/metrics/option.job.running)"
+              count="$(printf '%s' "$body" | sed -nE 's/.*"value":([0-9]+)(\.[0-9]+)?.*/\1/p')"
+              if [ "$count" != "0" ]; then
+                echo "작업 ${count:-?}개가 실행 중이라 배포하지 않습니다"
+                exit 1
+              fi
+            fi
+
+            printf '%s' "$COMPOSE_B64" | base64 --decode > docker-compose.yml
+            printf 'OPTION_IMAGE=%s\n' "$OPTION_IMAGE" > image.env
+
+            export DOCKER_CONFIG
+            DOCKER_CONFIG="$(mktemp -d)"
+            trap 'rm -rf -- "$DOCKER_CONFIG"' EXIT
+            printf '%s\n' "$DOCKERHUB_TOKEN" | docker login docker.io --username "$DOCKERHUB_USERNAME" --password-stdin
+
+            compose pull app
+            # 헬스체크가 통과해야 배포가 끝난다
+            compose up -d --wait --wait-timeout 360
+            compose ps
+            DEPLOY

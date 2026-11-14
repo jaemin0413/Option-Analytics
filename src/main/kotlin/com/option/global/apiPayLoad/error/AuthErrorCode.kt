@@ -13,4 +13,5 @@ enum class AuthErrorCode(
     INVALID_TOKEN(HttpStatus.UNAUTHORIZED, "A004", "토큰이 올바르지 않습니다."),
     EXPIRED_TOKEN(HttpStatus.UNAUTHORIZED, "A005", "토큰이 만료되었습니다."),
     USER_NOT_FOUND(HttpStatus.UNAUTHORIZED, "A006", "계정을 찾을 수 없습니다."),
+    JWT_SECRET_MISSING(HttpStatus.INTERNAL_SERVER_ERROR, "A007", "JWT 시크릿이 설정되지 않았습니다."),
 }

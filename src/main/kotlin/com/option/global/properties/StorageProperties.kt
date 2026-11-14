@@ -5,7 +5,6 @@ import org.springframework.boot.context.properties.ConfigurationProperties
 @ConfigurationProperties("storage")
 data class StorageProperties(
     val rawDir: String,
-    val tradesDir: String,
     val stopBackgroundFreeRatio: Double,
     val stopCollectionFreeRatio: Double,
     val minFreeBytes: Long,

@@ -3,3 +3,22 @@ spring:
     url: ${PROD_DB_URL}
     username: ${PROD_DB_USERNAME}
     password: ${PROD_DB_PASSWORD}
+
+server:
+  forward-headers-strategy: framework
+
+# 로깅
+logging:
+  file:
+    name: /data/logs/option.log
+  logback:
+    rollingpolicy:
+      max-history: 30
+      total-size-cap: 1GB
+
+# 스웨거 닫기
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
