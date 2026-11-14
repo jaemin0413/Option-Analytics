@@ -81,24 +81,22 @@ jobs:
       - name: Deploy
         uses: appleboy/ssh-action@v1.2.5
         env:
-          DEPLOY_DIR: ${{ vars.DEPLOY_DIR }}
           OPTION_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/option:sha-${{ github.sha }}
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         with:
-          host: ${{ vars.DEPLOY_HOST }}
-          username: ${{ vars.DEPLOY_USER }}
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
-          fingerprint: ${{ vars.DEPLOY_SSH_FINGERPRINT }}
+          host: 100.66.12.112
+          username: promevious
+          key: ${{ secrets.OPTION_SSH_PRIVATE_KEY }}
+          fingerprint: SHA256:fhMly2/oBnITaDynCpQJEFuT1oBpzpJmggxRvPnjYTM
           timeout: 30s
           command_timeout: 12m
-          envs: DEPLOY_DIR,COMPOSE_B64,OPTION_IMAGE,DOCKERHUB_USERNAME,DOCKERHUB_TOKEN
+          envs: COMPOSE_B64,OPTION_IMAGE,DOCKERHUB_USERNAME,DOCKERHUB_TOKEN
           script: |
             bash -se <<'DEPLOY'
             set -euo pipefail
-            mkdir -p "$DEPLOY_DIR"
-            cd "$DEPLOY_DIR"
-            test -s .env || { echo "$DEPLOY_DIR/.env가 없습니다"; exit 1; }
+            cd /home/promevious/services/apps/option
+            test -s .env || { echo ".env가 없습니다"; exit 1; }
             compose() { docker compose --env-file .env --env-file image.env "$@"; }
 
             # 앱이 떠 있고 수집, 계산 작업이 돌고 있으면 재시작하지 않는다. 끝난 뒤 다시 실행한다.
