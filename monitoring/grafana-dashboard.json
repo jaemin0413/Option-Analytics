@@ -1,0 +1,46 @@
+{
+  "title": "Option 수집",
+  "uid": "option-collection",
+  "schemaVersion": 39,
+  "refresh": "1m",
+  "time": { "from": "now-24h", "to": "now" },
+  "panels": [
+    { "id": 1, "type": "timeseries", "title": "호출 지연 p50/p95/p99 (초)", "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] }, "options": {},
+      "targets": [
+        { "refId": "A", "expr": "histogram_quantile(0.5, sum by (le, endpoint) (rate(option_http_seconds_bucket[5m])))", "legendFormat": "p50 {{endpoint}}" },
+        { "refId": "B", "expr": "histogram_quantile(0.95, sum by (le, endpoint) (rate(option_http_seconds_bucket[5m])))", "legendFormat": "p95 {{endpoint}}" },
+        { "refId": "C", "expr": "histogram_quantile(0.99, sum by (le, endpoint) (rate(option_http_seconds_bucket[5m])))", "legendFormat": "p99 {{endpoint}}" }
+      ] },
+    { "id": 2, "type": "timeseries", "title": "구간별 소요(초/초)", "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "fieldConfig": { "defaults": {}, "overrides": [] }, "options": {},
+      "targets": [
+        { "refId": "A", "expr": "sum(rate(option_http_seconds_sum[5m]))", "legendFormat": "HTTP" },
+        { "refId": "B", "expr": "sum(rate(option_parse_seconds_sum[5m]))", "legendFormat": "파싱" },
+        { "refId": "C", "expr": "sum(rate(option_raw_save_seconds_sum[5m]))", "legendFormat": "원본 저장" },
+        { "refId": "D", "expr": "sum(rate(option_db_load_seconds_sum[5m]))", "legendFormat": "DB 적재" }
+      ] },
+    { "id": 3, "type": "timeseries", "title": "실패 분류", "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "fieldConfig": { "defaults": {}, "overrides": [] }, "options": {},
+      "targets": [ { "refId": "A", "expr": "sum by (job, category) (increase(option_failure_total[1h]))", "legendFormat": "{{job}} {{category}}" } ] },
+    { "id": 4, "type": "timeseries", "title": "힙(왼쪽)·GC 초/초(오른쪽)", "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "fieldConfig": {
+        "defaults": { "unit": "bytes" },
+        "overrides": [ { "matcher": { "id": "byName", "options": "GC 초/초" }, "properties": [ { "id": "unit", "value": "none" }, { "id": "custom.axisPlacement", "value": "right" } ] } ]
+      }, "options": {},
+      "targets": [
+        { "refId": "A", "expr": "sum(jvm_memory_used_bytes{area=\"heap\"})", "legendFormat": "heap used" },
+        { "refId": "B", "expr": "sum(rate(jvm_gc_pause_seconds_sum[5m]))", "legendFormat": "GC 초/초" }
+      ] },
+    { "id": 5, "type": "gauge", "title": "백필 진행률", "gridPos": { "h": 6, "w": 6, "x": 0, "y": 16 },
+      "targets": [ { "refId": "A", "expr": "option_backfill_progress" } ], "options": {}, "fieldConfig": { "defaults": { "min": 0, "max": 1, "unit": "percentunit" }, "overrides": [] } },
+    { "id": 6, "type": "gauge", "title": "디스크 여유", "gridPos": { "h": 6, "w": 6, "x": 6, "y": 16 },
+      "targets": [ { "refId": "A", "expr": "option_disk_free_ratio" } ], "options": {}, "fieldConfig": { "defaults": { "min": 0, "max": 1, "unit": "percentunit" }, "overrides": [] } },
+    { "id": 7, "type": "timeseries", "title": "HikariCP", "gridPos": { "h": 6, "w": 12, "x": 12, "y": 16 },
+      "fieldConfig": { "defaults": {}, "overrides": [] }, "options": {},
+      "targets": [
+        { "refId": "A", "expr": "hikaricp_connections_active", "legendFormat": "active" },
+        { "refId": "B", "expr": "hikaricp_connections_pending", "legendFormat": "pending" }
+      ] }
+  ]
+}

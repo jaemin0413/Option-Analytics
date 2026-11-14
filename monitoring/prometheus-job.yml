@@ -1,0 +1,5 @@
+- job_name: option
+  metrics_path: /actuator/prometheus
+  scrape_interval: 30s
+  static_configs:
+    - targets: ["<apps Tailscale IP>:8091"]
