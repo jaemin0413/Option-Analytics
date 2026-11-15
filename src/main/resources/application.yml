@@ -15,6 +15,9 @@ spring:
       hibernate:
         jdbc:
           time_zone: UTC
+          # 배치 사이즈 설정
+          batch_size: 1000
+        order_updates: true
 
 # 타임아웃 설정
   http:
