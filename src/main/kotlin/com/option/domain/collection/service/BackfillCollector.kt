@@ -7,7 +7,7 @@ import com.option.domain.collection.client.etDateOrNull
 import com.option.domain.collection.client.longOrNull
 import com.option.domain.collection.repository.RawFileRepository
 import com.option.domain.market.entity.OptionDaily
-import com.option.domain.market.repository.OptionDailyRepository
+import com.option.domain.market.repository.OptionDailyBatchRepository
 import com.option.domain.market.service.TradingCalendarService
 import com.option.domain.market.vo.Feeds
 import com.option.domain.market.util.MarketTime
@@ -27,7 +27,7 @@ class BackfillCollector(
     private val alpacaClient: AlpacaClient,
     private val rawFileStore: RawFileStore,
     private val rawFileRepository: RawFileRepository,
-    private val optionDailyRepository: OptionDailyRepository,
+    private val optionDailyBatchRepository: OptionDailyBatchRepository,
     private val tradingCalendarService: TradingCalendarService,
     private val backfillWindow: BackfillWindow,
     private val diskGuard: DiskGuard,
@@ -122,7 +122,7 @@ class BackfillCollector(
             }
             jobRunner.inTransaction(context) {
                 rawFileRepository.save(file)
-                optionDailyRepository.saveAll(rows)
+                optionDailyBatchRepository.insertAll(rows)
             }
             context.rowsWritten += rows.size
         }
