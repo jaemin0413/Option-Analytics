@@ -1,5 +1,6 @@
 package com.option.domain.model.service
 
+import com.option.domain.market.service.UniverseService
 import com.option.domain.collection.service.JobRunner
 import com.option.domain.collection.service.RunContext
 import com.option.domain.market.entity.OptionDaily
@@ -28,7 +29,6 @@ import com.option.domain.model.repository.TickerDailyMetricRepository
 import com.option.domain.model.vo.Horizon
 import com.option.domain.model.vo.ModelVersions
 import com.option.domain.model.vo.PublicationStatus
-import com.option.global.properties.UniverseProperties
 import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Service
 import java.time.LocalDate
@@ -47,7 +47,7 @@ class BackfillModelService(
     private val macroDailyRepository: MacroDailyRepository,
     private val tradingCalendarService: TradingCalendarService,
     private val scoringService: ScoringService,
-    private val universeProperties: UniverseProperties,
+    private val universeService: UniverseService,
     private val jobRunner: JobRunner,
 ) {
     fun compute(context: RunContext) {
@@ -82,7 +82,7 @@ class BackfillModelService(
             // 거래일 하나의 지표와 신호를 모아서 한 번에 넣는다
             val metrics = mutableListOf<TickerDailyMetric>()
             val allSignals = mutableListOf<HypothesisSignal>()
-            for (symbol in universeProperties.backfillSymbols) {
+            for (symbol in universeService.symbols()) {
                 val metric = computeMetric(publication.publicationId!!, symbol, base, target, weekTarget, calendar, rate) ?: continue
                 metrics += metric
                 val signal = HypothesisRules.pcrContrarian(metric.pcrPercentile)
