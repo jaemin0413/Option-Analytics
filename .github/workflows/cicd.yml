@@ -101,7 +101,7 @@ jobs:
 
             # 앱이 떠 있고 수집, 계산 작업이 돌고 있으면 재시작하지 않는다. 끝난 뒤 다시 실행한다.
             if [ -s image.env ] && [ -n "$(compose ps -q --status running app)" ]; then
-              body="$(compose exec -T app curl -fsS http://localhost:8081/actuator/metrics/option.job.running)"
+              body="$(compose exec -T app curl -fsS http://localhost:8081/actuator/metrics/option.job.running </dev/null)"
               count="$(printf '%s' "$body" | sed -nE 's/.*"value":([0-9]+)(\.[0-9]+)?.*/\1/p')"
               if [ "$count" != "0" ]; then
                 echo "작업 ${count:-?}개가 실행 중이라 배포하지 않습니다"
