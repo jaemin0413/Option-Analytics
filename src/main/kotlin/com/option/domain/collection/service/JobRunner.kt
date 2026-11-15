@@ -36,7 +36,8 @@ class JobRunner(
 
     // 작업 돌리고 로깅
     fun execute(context: RunContext, body: (RunContext) -> Unit = context.job::run) {
-        val sample = meterRegistry.timer("option.job", "job", context.job.name)
+        // 실패해서 빨리 끝난 실행이 빨라진 것처럼 보이지 않게 결과로 나눈다
+        var result = "failed"
         running.incrementAndGet()
         try {
             if (diskGuard.isTooLow(context.job)) {
@@ -44,12 +45,16 @@ class JobRunner(
                 return
             }
             body(context)
+            result = if (context.symbolsFailed > 0) "partial" else "success"
         } catch (e: Exception) {
             recordFailure(context, "JOB", classify(e), e.message)
             logger.error("job={} session={} 실패", context.job.name, context.session, e)
         } finally {
             running.decrementAndGet()
-            sample.record(Duration.between(context.startedAt, clock.instant()))
+            meterRegistry.timer("option.job", "job", context.job.name, "result", result)
+                .record(Duration.between(context.startedAt, clock.instant()))
+            // 적재 시간(option.db.load)과 나눠 rows/s를 본다
+            meterRegistry.counter("option.rows", "job", context.job.name).increment(context.rowsWritten.toDouble())
             logger.info(
                 "job={} session={} ok={} failed={} rows={} stoppedEarly={} {}",
                 context.job.name, context.session, context.symbolsOk, context.symbolsFailed,
