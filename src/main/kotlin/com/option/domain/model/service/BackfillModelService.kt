@@ -21,8 +21,9 @@ import com.option.domain.model.calculator.RealizedVolCalculator
 import com.option.domain.model.entity.HypothesisSignal
 import com.option.domain.model.entity.Publication
 import com.option.domain.model.entity.TickerDailyMetric
-import com.option.domain.model.repository.HypothesisSignalRepository
+import com.option.domain.model.repository.HypothesisSignalBatchRepository
 import com.option.domain.model.repository.PublicationRepository
+import com.option.domain.model.repository.TickerDailyMetricBatchRepository
 import com.option.domain.model.repository.TickerDailyMetricRepository
 import com.option.domain.model.vo.Horizon
 import com.option.domain.model.vo.ModelVersions
@@ -39,7 +40,8 @@ import kotlin.math.abs
 class BackfillModelService(
     private val publicationRepository: PublicationRepository,
     private val tickerDailyMetricRepository: TickerDailyMetricRepository,
-    private val hypothesisSignalRepository: HypothesisSignalRepository,
+    private val tickerDailyMetricBatchRepository: TickerDailyMetricBatchRepository,
+    private val hypothesisSignalBatchRepository: HypothesisSignalBatchRepository,
     private val optionDailyRepository: OptionDailyRepository,
     private val stockDailyRepository: StockDailyRepository,
     private val macroDailyRepository: MacroDailyRepository,
@@ -77,9 +79,12 @@ class BackfillModelService(
             val publication = publicationRepository.save(
                 Publication(sessionDate = base, modelVersion = ModelVersions.BACKFILL, status = PublicationStatus.BACKFILL),
             )
+            // 거래일 하나의 지표와 신호를 모아서 한 번에 넣는다
+            val metrics = mutableListOf<TickerDailyMetric>()
+            val allSignals = mutableListOf<HypothesisSignal>()
             for (symbol in universeProperties.backfillSymbols) {
                 val metric = computeMetric(publication.publicationId!!, symbol, base, target, weekTarget, calendar, rate) ?: continue
-                tickerDailyMetricRepository.save(metric)
+                metrics += metric
                 val signal = HypothesisRules.pcrContrarian(metric.pcrPercentile)
                 val horizons = listOf(Horizon.NEXT_DAY to target, Horizon.WEEK to weekTarget)
                 val signals = horizons.map { (horizon, session) ->
@@ -93,9 +98,11 @@ class BackfillModelService(
                         inputValue = metric.pcrPercentile,
                     )
                 }
-                hypothesisSignalRepository.saveAll(signals)
+                allSignals += signals
                 context.rowsWritten++
             }
+            tickerDailyMetricBatchRepository.insertAll(metrics)
+            hypothesisSignalBatchRepository.insertAll(allSignals)
         }
     }
 
