@@ -7,6 +7,13 @@ spring:
   application:
     name: option
 
+# 스프링 배치
+  batch:
+    job:
+      enabled: false
+    jdbc:
+      initialize-schema: always
+
   jpa:
     open-in-view: false
     hibernate:
@@ -74,7 +81,8 @@ storage:
 job:
   backfill-start: 2024-01-01
   backfill-expiration-start: 2024-02-01
+  # 백필이 실패하면 이 간격으로 3번까지 이어서 다시 돈다
+  backfill-retry-wait: 1m
 
 universe:
   only: ${OPTION_UNIVERSE_ONLY:}
-  backfill-symbols: SPY, QQQ
