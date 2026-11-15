@@ -5,7 +5,7 @@ import com.option.domain.collection.client.AlpacaClient
 import com.option.domain.collection.client.doubleOrNull
 import com.option.domain.collection.client.etDateOrNull
 import com.option.domain.collection.client.longOrNull
-import com.option.domain.collection.repository.RawFileRepository
+import com.option.domain.collection.repository.RawFileBatchRepository
 import com.option.domain.market.entity.OptionDaily
 import com.option.domain.market.repository.OptionDailyBatchRepository
 import com.option.domain.market.service.TradingCalendarService
@@ -26,7 +26,7 @@ import java.util.concurrent.atomic.AtomicReference
 class BackfillCollector(
     private val alpacaClient: AlpacaClient,
     private val rawFileStore: RawFileStore,
-    private val rawFileRepository: RawFileRepository,
+    private val rawFileBatchRepository: RawFileBatchRepository,
     private val optionDailyBatchRepository: OptionDailyBatchRepository,
     private val tradingCalendarService: TradingCalendarService,
     private val backfillWindow: BackfillWindow,
@@ -87,7 +87,7 @@ class BackfillCollector(
                 trading = true,
             ) { response, page, json ->
                 val file = rawFileStore.save(context, response, underlying, page)
-                jobRunner.inTransaction(context) { rawFileRepository.save(file) }
+                jobRunner.inTransaction(context) { rawFileBatchRepository.insertAll(listOf(file)) }
                 json.path("option_contracts").forEach { symbols += it.path("symbol").asText() }
             }
         }
@@ -121,7 +121,7 @@ class BackfillCollector(
                 }
             }
             jobRunner.inTransaction(context) {
-                rawFileRepository.save(file)
+                rawFileBatchRepository.insertAll(listOf(file))
                 optionDailyBatchRepository.insertAll(rows)
             }
             context.rowsWritten += rows.size
