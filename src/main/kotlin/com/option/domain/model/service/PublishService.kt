@@ -36,13 +36,16 @@ import com.option.domain.model.vo.PublicationStatus
 import com.option.domain.model.vo.Signal
 import com.option.global.apiPayLoad.error.ModelErrorCode
 import com.option.global.apiPayLoad.exception.BusinessException
+import io.micrometer.core.instrument.MeterRegistry
 import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
 import java.time.Clock
+import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.abs
 
 // 발표 작업
@@ -61,7 +64,11 @@ class PublishService(
     private val jobRunner: JobRunner,
     private val transactionTemplate: TransactionTemplate,
     private val clock: Clock,
+    meterRegistry: MeterRegistry,
 ) {
+    // 마지막 발표가 21시 마감보다 몇 초 늦었는지. 음수면 마감 전에 준비가 끝났다는 뜻이다.
+    private val publishDelay = meterRegistry.gauge("option.publish.delay.seconds", AtomicLong(0))!!
+
     // 지표와 시장심리 계산
     fun compute(context: RunContext) {
         val base = context.session
@@ -105,6 +112,8 @@ class PublishService(
 
     // 21시에 발표
     fun publish(session: LocalDate) {
+        val now = clock.instant()
+        val slot = slotOf(session)
         transactionTemplate.executeWithoutResult {
             if (publicationRepository.existsBySessionDateAndStatus(session, PublicationStatus.PUBLISHED)) {
                 throw BusinessException(ModelErrorCode.ALREADY_PUBLISHED, mapOf("session" to session))
@@ -113,14 +122,15 @@ class PublishService(
                 .findFirstBySessionDateAndStatusOrderByPublicationIdDesc(session, PublicationStatus.COMPUTED)
                 ?: throw BusinessException(ModelErrorCode.PUBLICATION_NOT_FOUND, mapOf("session" to session))
             publication.status = PublicationStatus.PUBLISHED
-            publication.publishedAt = visibleAt(session, clock.instant())
+            publication.publishedAt = if (slot != null && now.isBefore(slot)) slot else now
         }
+        if (slot != null) publishDelay.set(Duration.between(slot, now).seconds)
     }
 
-    private fun visibleAt(session: LocalDate, now: Instant): Instant {
-        val day = tradingCalendarService.calendar().next(session) ?: return now
-        val slot = day.atTime(LocalTime.of(21, 0)).atZone(MarketTime.KST).toInstant()
-        return if (now.isBefore(slot)) slot else now
+    // 다음 거래일 21시(KST)
+    private fun slotOf(session: LocalDate): Instant? {
+        val day = tradingCalendarService.calendar().next(session) ?: return null
+        return day.atTime(LocalTime.of(21, 0)).atZone(MarketTime.KST).toInstant()
     }
 
     private data class SymbolInput(
