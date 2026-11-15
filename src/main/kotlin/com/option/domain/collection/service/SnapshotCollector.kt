@@ -7,9 +7,9 @@ import com.option.domain.collection.client.etDateOrNull
 import com.option.domain.collection.client.instantOrNull
 import com.option.domain.collection.client.longOrNull
 import com.option.domain.collection.entity.RawFile
-import com.option.domain.collection.repository.RawFileRepository
+import com.option.domain.collection.repository.RawFileBatchRepository
 import com.option.domain.market.entity.OptionDaily
-import com.option.domain.market.repository.OptionDailyRepository
+import com.option.domain.market.repository.OptionDailyBatchRepository
 import com.option.domain.market.service.UniverseService
 import com.option.domain.market.vo.Feeds
 import com.option.domain.market.util.OccSymbol
@@ -22,8 +22,8 @@ import java.time.LocalDate
 class SnapshotCollector(
     private val alpacaClient: AlpacaClient,
     private val rawFileStore: RawFileStore,
-    private val rawFileRepository: RawFileRepository,
-    private val optionDailyRepository: OptionDailyRepository,
+    private val rawFileBatchRepository: RawFileBatchRepository,
+    private val optionDailyBatchRepository: OptionDailyBatchRepository,
     private val universeService: UniverseService,
     private val jobRunner: JobRunner,
 ) {
@@ -53,8 +53,8 @@ class SnapshotCollector(
             }
         }
         jobRunner.inTransaction(context) {
-            rawFileRepository.saveAll(files)
-            optionDailyRepository.saveAll(rows)
+            rawFileBatchRepository.insertAll(files)
+            optionDailyBatchRepository.insertAll(rows)
         }
         context.rowsWritten += rows.size
     }

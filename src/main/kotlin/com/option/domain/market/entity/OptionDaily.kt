@@ -13,7 +13,8 @@ import jakarta.persistence.Table
 import java.time.Instant
 import java.time.LocalDate
 
-// 종목 각각에서 체결된 계약 하나
+// 종목 각각에서 체결된 계약 하나.
+// 컬럼 바뀌면 OptionDailyBatchRepository 고쳐야함!!
 @Entity
 @Table(name = "option_daily")
 class OptionDaily(

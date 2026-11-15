@@ -5,8 +5,9 @@ import com.option.domain.collection.client.AlpacaClient
 import com.option.domain.collection.client.longOrNull
 import com.option.domain.collection.client.textOrNull
 import com.option.domain.collection.entity.RawFile
-import com.option.domain.collection.repository.RawFileRepository
+import com.option.domain.collection.repository.RawFileBatchRepository
 import com.option.domain.market.entity.OptionDaily
+import com.option.domain.market.repository.OptionDailyBatchRepository
 import com.option.domain.market.repository.OptionDailyRepository
 import com.option.domain.market.service.TradingCalendarService
 import com.option.domain.market.service.UniverseService
@@ -22,8 +23,9 @@ import java.time.LocalDate
 class ContractCollector(
     private val alpacaClient: AlpacaClient,
     private val rawFileStore: RawFileStore,
-    private val rawFileRepository: RawFileRepository,
+    private val rawFileBatchRepository: RawFileBatchRepository,
     private val optionDailyRepository: OptionDailyRepository,
+    private val optionDailyBatchRepository: OptionDailyBatchRepository,
     private val universeService: UniverseService,
     private val tradingCalendarService: TradingCalendarService,
     private val jobRunner: JobRunner,
@@ -61,7 +63,7 @@ class ContractCollector(
         }
 
         jobRunner.inTransaction(context) {
-            rawFileRepository.saveAll(files)
+            rawFileBatchRepository.insertAll(files)
             val written = applyOi(symbol, contracts, context, calendar, receivedAt)
             context.rowsWritten += written
         }
@@ -102,7 +104,8 @@ class ContractCollector(
             row.oiAsOfDate = oiDate
             row.oiDelayDays = if (oiDate != null) calendar.countBetween(oiDate, session) else null
         }
-        optionDailyRepository.saveAll(added)
+        // 배치사이즈로 묶어서 보내기
+        optionDailyBatchRepository.insertAll(added)
         return contracts.size
     }
 }
