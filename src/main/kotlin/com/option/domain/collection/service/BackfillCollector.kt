@@ -5,36 +5,34 @@ import com.option.domain.collection.client.AlpacaClient
 import com.option.domain.collection.client.doubleOrNull
 import com.option.domain.collection.client.etDateOrNull
 import com.option.domain.collection.client.longOrNull
+import com.option.domain.collection.entity.BackfillTarget
+import com.option.domain.collection.entity.RawFile
+import com.option.domain.collection.repository.BackfillTargetRepository
 import com.option.domain.collection.repository.RawFileBatchRepository
 import com.option.domain.market.entity.OptionDaily
 import com.option.domain.market.repository.OptionDailyBatchRepository
-import com.option.domain.market.service.TradingCalendarService
 import com.option.domain.market.vo.Feeds
-import com.option.domain.market.util.MarketTime
 import com.option.domain.market.util.OccSymbol
 import com.option.global.properties.JobProperties
-import com.option.global.properties.UniverseProperties
 import io.micrometer.core.instrument.Gauge
 import io.micrometer.core.instrument.MeterRegistry
 import org.springframework.stereotype.Service
-import java.time.Clock
 import java.time.LocalDate
 import java.util.concurrent.atomic.AtomicReference
 
-// 백필 작업, 2년치 데이터 다 때려박을 예정
+// 백필 작업, 2년치 데이터 다 때려박을 예정.
+// 안정성을 위해 배치 적용
 @Service
 class BackfillCollector(
     private val alpacaClient: AlpacaClient,
     private val rawFileStore: RawFileStore,
     private val rawFileBatchRepository: RawFileBatchRepository,
     private val optionDailyBatchRepository: OptionDailyBatchRepository,
-    private val tradingCalendarService: TradingCalendarService,
+    private val backfillTargetRepository: BackfillTargetRepository,
     private val backfillWindow: BackfillWindow,
     private val diskGuard: DiskGuard,
     private val jobProperties: JobProperties,
-    private val universeProperties: UniverseProperties,
     private val jobRunner: JobRunner,
-    private val clock: Clock,
     meterRegistry: MeterRegistry,
 ) {
     private val progress = AtomicReference(0.0)
@@ -43,40 +41,16 @@ class BackfillCollector(
         Gauge.builder("option.backfill.progress") { progress.get() }.register(meterRegistry)
     }
 
-    // 계약 목록을 묶어 일봉으로 받음
-    fun collect(context: RunContext) {
-        val today = clock.instant().atZone(MarketTime.ET).toLocalDate()
-        val end = tradingCalendarService.calendar().prev(today) ?: today.minusDays(1)
-        progress.set(0.0)
-
-        val contracts = universeProperties.backfillSymbols.associateWith { collectContracts(context, it, today) }
-        val chunks = contracts.flatMap { (underlying, symbols) ->
-            symbols.chunked(CHUNK).mapIndexed { index, chunk -> Triple(underlying, index, chunk) }
-        }
-        context.symbolsTotal = chunks.size
-
-        chunks.forEachIndexed { done, (underlying, index, chunk) ->
-            waitOutPauseWindow(context)
-            if (diskGuard.isTooLow(context.job)) {
-                context.stoppedEarly = true
-                context.addNote("디스크 여유 부족으로 ${done}번째 묶음에서 중단")
-                return
-            }
-            jobRunner.isolated(context, "$underlying:$index") { collectChunk(context, underlying, index, chunk, end) }
-            progress.set((done + 1).toDouble() / chunks.size)
-        }
-    }
-
     // 만료된 계약이랑 살아 있는 계약 다 모으고 표준 심볼만 남기기
-    private fun collectContracts(context: RunContext, underlying: String, today: LocalDate): List<String> {
+    fun listContracts(context: RunContext, underlying: String, asOf: LocalDate): List<String> {
         val symbols = mutableListOf<String>()
         val conditions = listOf(
             mapOf(
                 "status" to "inactive",
                 "expiration_date_gte" to jobProperties.backfillExpirationStart.toString(),
-                "expiration_date_lte" to today.toString(),
+                "expiration_date_lte" to asOf.toString(),
             ),
-            mapOf("status" to "active", "expiration_date_gte" to today.toString()),
+            mapOf("status" to "active", "expiration_date_gte" to asOf.toString()),
         )
         conditions.forEach { condition ->
             alpacaClient.forEachPage(
@@ -97,38 +71,50 @@ class BackfillCollector(
     }
 
     // 계약 한 묶음의 일봉을 받아 저장
-    private fun collectChunk(context: RunContext, underlying: String, index: Int, contracts: List<String>, end: LocalDate) {
+    fun fetch(context: RunContext, target: BackfillTarget, end: LocalDate): BackfillChunk {
+        waitOutPauseWindow()
+        if (diskGuard.isTooLow(context.job)) throw IllegalStateException("디스크 여유 부족으로 ${target.underlying}:${target.groupIndex}에서 멈춤")
+        val files = mutableListOf<RawFile>()
+        val rows = mutableListOf<OptionDaily>()
         alpacaClient.forEachPage(
             context,
             "option_bars",
             "/v1beta1/options/bars",
             mapOf(
-                "symbols" to contracts.joinToString(","),
+                "symbols" to target.contracts,
                 "timeframe" to "1Day",
                 "start" to jobProperties.backfillStart.toString(),
                 "end" to end.toString(),
                 "limit" to "10000",
             ),
         ) { response, page, json ->
-            val file = rawFileStore.save(context, response, "$underlying-$index", page)
-            val rows = mutableListOf<OptionDaily>()
+            files += rawFileStore.save(context, response, "${target.underlying}-${target.groupIndex}", page)
             json.path("bars").fields().forEach { (contract, bars) ->
                 for (bar in bars) {
-                    val row = toRow(underlying, contract, bar, response.receivedAt)
+                    val row = toRow(target.underlying, contract, bar, response.receivedAt)
                     if (row != null) {
                         rows.add(row)
                     }
                 }
             }
-            jobRunner.inTransaction(context) {
-                rawFileBatchRepository.insertAll(listOf(file))
-                optionDailyBatchRepository.insertAll(rows)
-            }
-            context.rowsWritten += rows.size
         }
+        return BackfillChunk(target.id!!, files, rows)
     }
 
-    private fun waitOutPauseWindow(context: RunContext) {
+    // 저장할 데이터들과 배치 진행상황을 같이 저장
+    fun write(context: RunContext, chunks: List<BackfillChunk>) {
+        if (chunks.isEmpty()) return
+        val rows = chunks.flatMap { it.rows }
+        jobRunner.inTransaction(context) {
+            rawFileBatchRepository.insertAll(chunks.flatMap { it.files })
+            optionDailyBatchRepository.insertAll(rows)
+        }
+        context.symbolsOk += chunks.size
+        context.rowsWritten += rows.size
+        progress.set(backfillTargetRepository.countByIdLessThanEqual(chunks.last().targetId).toDouble() / backfillTargetRepository.count())
+    }
+
+    private fun waitOutPauseWindow() {
         while (backfillWindow.isPaused()) {
             Thread.sleep(PAUSE_POLL_MILLIS)
         }
@@ -165,7 +151,13 @@ class BackfillCollector(
     }
 
     private companion object {
-        const val CHUNK = 100
         const val PAUSE_POLL_MILLIS = 60_000L
     }
 }
+
+// 계약 묶음 하나를 받은 결과
+class BackfillChunk(
+    val targetId: Long,
+    val files: List<RawFile>,
+    val rows: List<OptionDaily>,
+)

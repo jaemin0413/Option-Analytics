@@ -44,6 +44,9 @@ dependencies {
     // 엑셀 파싱
     implementation("org.apache.poi:poi-ooxml:5.4.1")
 
+    // 스프링 배치
+    implementation("org.springframework.boot:spring-boot-starter-batch")
+
     // grafana
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("io.micrometer:micrometer-registry-prometheus")
