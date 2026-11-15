@@ -11,6 +11,7 @@ import com.option.domain.model.entity.Score
 import com.option.domain.model.entity.TickerDailyMetric
 import com.option.domain.model.repository.HypothesisSignalRepository
 import com.option.domain.model.repository.PublicationRepository
+import com.option.domain.model.repository.ScoreBatchRepository
 import com.option.domain.model.repository.ScoreRepository
 import com.option.domain.model.repository.TickerDailyMetricRepository
 import com.option.domain.model.vo.Horizon
@@ -31,6 +32,7 @@ class ScoringService(
     private val hypothesisSignalRepository: HypothesisSignalRepository,
     private val publicationRepository: PublicationRepository,
     private val scoreRepository: ScoreRepository,
+    private val scoreBatchRepository: ScoreBatchRepository,
     private val journalRepository: JournalRepository,
     private val stockDailyRepository: StockDailyRepository,
     private val tradingCalendarService: TradingCalendarService,
@@ -109,7 +111,7 @@ class ScoringService(
         }
 
         val fresh = scorer.scores.filter { Key(it.publicationId, it.userId, it.symbol, it.subject, it.horizon) !in done }
-        scoreRepository.saveAll(fresh)
+        scoreBatchRepository.insertAll(fresh)
         fresh.size
     } ?: 0
 

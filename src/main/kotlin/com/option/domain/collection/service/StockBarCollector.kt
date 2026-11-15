@@ -6,8 +6,9 @@ import com.option.domain.collection.client.doubleOrNull
 import com.option.domain.collection.client.etDateOrNull
 import com.option.domain.collection.client.longOrNull
 import com.option.domain.collection.entity.RawFile
-import com.option.domain.collection.repository.RawFileRepository
+import com.option.domain.collection.repository.RawFileBatchRepository
 import com.option.domain.market.entity.StockDaily
+import com.option.domain.market.repository.StockDailyBatchRepository
 import com.option.domain.market.repository.StockDailyRepository
 import com.option.domain.market.service.UniverseService
 import com.option.domain.market.vo.Feeds
@@ -20,8 +21,9 @@ import kotlin.math.abs
 class StockBarCollector(
     private val alpacaClient: AlpacaClient,
     private val rawFileStore: RawFileStore,
-    private val rawFileRepository: RawFileRepository,
+    private val rawFileBatchRepository: RawFileBatchRepository,
     private val stockDailyRepository: StockDailyRepository,
+    private val stockDailyBatchRepository: StockDailyBatchRepository,
     private val universeService: UniverseService,
     private val jobRunner: JobRunner,
 ) {
@@ -82,7 +84,7 @@ class StockBarCollector(
                 }
             }
         }
-        jobRunner.inTransaction(context) { rawFileRepository.saveAll(files) }
+        jobRunner.inTransaction(context) { rawFileBatchRepository.insertAll(files) }
         return Bars(raw, adjusted)
     }
 
@@ -119,7 +121,7 @@ class StockBarCollector(
                 receivedAt = context.startedAt,
             )
         }
-        stockDailyRepository.saveAll(added)
+        stockDailyBatchRepository.insertAll(added)
         context.rowsWritten += added.size
         return drifted
     }
