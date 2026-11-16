@@ -12,12 +12,13 @@ import jakarta.persistence.Enumerated
 import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
+import jakarta.persistence.Index
 import jakarta.persistence.Table
 import java.time.LocalDate
 
 // 예측 점수
 @Entity
-@Table(name = "score")
+@Table(name = "score", indexes = [Index(name = "ix_score_target", columnList = "target_session")])
 class Score(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
