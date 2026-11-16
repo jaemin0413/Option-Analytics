@@ -9,6 +9,8 @@ data class HitRateRow(
     val horizon: String,
     @Schema(description = "PROVIDER(제공자 IV) 또는 BACKFILL(역산 IV, 등급 D). 성적을 섞지 않는다")
     val ivSource: String,
+    @Schema(description = "GEX 레짐 행만 POSITIVE(억제), NEGATIVE(증폭), NO_DATA로 나눈다. 다른 대상은 null")
+    val regime: String?,
     @Schema(description = "평가 시작일")
     val startDate: LocalDate,
     val total: Long,

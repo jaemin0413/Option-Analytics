@@ -3,6 +3,7 @@ package com.option.domain.model.repository
 import com.option.domain.market.vo.SymbolGroup
 import com.option.domain.model.dto.response.HitRateDailyRow
 import com.option.domain.model.dto.response.HitRateRow
+import com.option.domain.model.vo.ScoreSubjects
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
 import java.sql.ResultSet
@@ -27,6 +28,7 @@ class HitRateQueryRepository(
         return jdbcTemplate.query(
             """
             SELECT subject, horizon, iv_source,
+                   CASE WHEN subject = ? THEN prediction END AS regime,
                    MIN(target_session) AS start_date,
                    COUNT(*) AS total,
                    COUNT(hit) AS scored,
@@ -44,10 +46,11 @@ class HitRateQueryRepository(
                    AVG(range_pct) AS avg_range_pct
             FROM score
             WHERE ${conditions.joinToString(" AND ")}
-            GROUP BY subject, horizon, iv_source
-            ORDER BY subject, horizon, iv_source
+            GROUP BY subject, horizon, iv_source, regime
+            ORDER BY subject, horizon, iv_source, regime
             """,
             { rs, _ -> toRow(rs) },
+            ScoreSubjects.GEX_REGIME,
             *args.toTypedArray(),
         )
     }
@@ -77,6 +80,7 @@ class HitRateQueryRepository(
         subject = rs.getString("subject"),
         horizon = rs.getString("horizon"),
         ivSource = rs.getString("iv_source"),
+        regime = rs.getString("regime"),
         startDate = rs.getDate("start_date").toLocalDate(),
         total = rs.getLong("total"),
         scored = rs.getLong("scored"),
