@@ -8,6 +8,7 @@ import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.Timer
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
+import org.springframework.web.client.HttpClientErrorException
 import org.springframework.web.client.RestClient
 import org.springframework.web.util.UriComponentsBuilder
 import java.net.URLEncoder
@@ -25,16 +26,23 @@ data class RawResponse(
 
 // 분당 200회 한도
 @Component
-class AlpacaRateGate(alpacaProperties: AlpacaProperties) {
+class AlpacaRateGate(alpacaProperties: AlpacaProperties, meterRegistry: MeterRegistry) {
+    // 병렬일 때 한도 때문에 기다린 시간
+    private val waitTimer = meterRegistry.timer("option.alpaca.gate.wait")
     private val intervalMillis = alpacaProperties.minCallInterval.toMillis()
     private var nextAllowed = 0L
 
-    // 시간간격 두기
-    @Synchronized
+    // 잠금 안에서는 내 차례 시각만 예약하고, 기다리는 건 잠금 밖에서 한다. 그래야 기다린 시간이 전부 지표에 잡힌다
     fun await() {
-        val wait = nextAllowed - System.currentTimeMillis()
+        val now = System.currentTimeMillis()
+        val slot = synchronized(this) {
+            val slot = maxOf(nextAllowed, now)
+            nextAllowed = slot + intervalMillis
+            slot
+        }
+        val wait = slot - now
+        waitTimer.record(Duration.ofMillis(wait))
         if (wait > 0) Thread.sleep(wait)
-        nextAllowed = System.currentTimeMillis() + intervalMillis
     }
 }
 
@@ -96,8 +104,29 @@ class AlpacaClient(
         return json
     }
 
-    // 호출
+    // 호출. 429면 한도가 풀릴 때까지 기다렸다가 같은 호출을 다시 한다
     private fun get(context: RunContext, endpoint: String, url: String, params: Map<String, String>): RawResponse {
+        repeat(RATE_LIMIT_RETRIES) { attempt ->
+            try {
+                return call(context, endpoint, url, params)
+            } catch (e: HttpClientErrorException.TooManyRequests) {
+                val wait = untilReset(e)
+                meterRegistry.counter("option.alpaca.retry", "endpoint", endpoint).increment()
+                logger.warn("job={} endpoint={} 429, {}ms 뒤 다시 호출 ({}/{})", context.job.name, endpoint, wait, attempt + 1, RATE_LIMIT_RETRIES)
+                Thread.sleep(wait)
+            }
+        }
+        return call(context, endpoint, url, params)
+    }
+
+    // X-Ratelimit-Reset(초 단위 epoch)까지 남은 시간. 헤더가 없으면 설정한 고정 대기
+    private fun untilReset(e: HttpClientErrorException): Long {
+        val reset = e.responseHeaders?.getFirst("X-Ratelimit-Reset")?.toLongOrNull()
+            ?: return alpacaProperties.rateLimitWait.toMillis()
+        return (reset * 1000 - clock.millis()).coerceIn(0, 60_000)
+    }
+
+    private fun call(context: RunContext, endpoint: String, url: String, params: Map<String, String>): RawResponse {
         gate.await()
         val builder = UriComponentsBuilder.fromUriString(url)
         for ((key, value) in params) {
@@ -115,4 +144,9 @@ class AlpacaClient(
 
     private fun httpTimer(endpoint: String): Timer =
         Timer.builder("option.http").tag("endpoint", endpoint).publishPercentileHistogram().register(meterRegistry)
+
+    private companion object {
+        // 호출 하나당 429 재시도 횟수
+        const val RATE_LIMIT_RETRIES = 7
+    }
 }
