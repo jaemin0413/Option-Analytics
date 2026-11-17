@@ -10,6 +10,7 @@ import jakarta.persistence.Enumerated
 import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
+import jakarta.persistence.Index
 import jakarta.persistence.Table
 import jakarta.persistence.UniqueConstraint
 import java.time.LocalDate
@@ -19,6 +20,7 @@ import java.time.LocalDate
 @Table(
     name = "hypothesis_signal",
     uniqueConstraints = [UniqueConstraint(name = "uk_signal", columnNames = ["publication_id", "symbol", "hypothesis", "horizon"])],
+    indexes = [Index(name = "ix_signal_target", columnList = "target_session")],
 )
 class HypothesisSignal(
     @Id

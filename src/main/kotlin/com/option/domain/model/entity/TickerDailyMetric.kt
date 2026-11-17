@@ -7,6 +7,7 @@ import jakarta.persistence.Entity
 import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
+import jakarta.persistence.Index
 import jakarta.persistence.Table
 import jakarta.persistence.UniqueConstraint
 import org.hibernate.annotations.JdbcTypeCode
@@ -18,6 +19,7 @@ import java.time.LocalDate
 @Table(
     name = "ticker_daily_metric",
     uniqueConstraints = [UniqueConstraint(name = "uk_metric", columnNames = ["publication_id", "symbol"])],
+    indexes = [Index(name = "ix_metric_symbol_base", columnList = "symbol, base_session")],
 )
 class TickerDailyMetric(
     @Id

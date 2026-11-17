@@ -63,7 +63,10 @@ alpaca:
   key-id: ${APCA_API_KEY_ID:}
   secret-key: ${APCA_API_SECRET_KEY:}
   # 분당 200한도
-  min-call-interval: 300ms
+  min-call-interval: 305ms
+  rate-limit-wait: 10s
+  # 3개 병렬화
+  concurrency: ${ALPACA_CONCURRENCY:3}
 
 fred:
   api-key: ${FRED_API_KEY:}

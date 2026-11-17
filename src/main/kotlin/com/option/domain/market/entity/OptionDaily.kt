@@ -9,6 +9,7 @@ import jakarta.persistence.Enumerated
 import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
+import jakarta.persistence.Index
 import jakarta.persistence.Table
 import java.time.Instant
 import java.time.LocalDate
@@ -16,7 +17,7 @@ import java.time.LocalDate
 // 종목 각각에서 체결된 계약 하나.
 // 컬럼 바뀌면 OptionDailyBatchRepository 고쳐야함!!
 @Entity
-@Table(name = "option_daily")
+@Table(name = "option_daily", indexes = [Index(name = "ix_option_daily_lookup", columnList = "underlying, feed, session_date")])
 class OptionDaily(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

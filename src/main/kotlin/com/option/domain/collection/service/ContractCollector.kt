@@ -14,6 +14,7 @@ import com.option.domain.market.service.UniverseService
 import com.option.domain.market.vo.Feeds
 import com.option.domain.market.vo.OptionType
 import com.option.domain.market.util.SessionCalendar
+import com.option.global.properties.AlpacaProperties
 import org.springframework.stereotype.Service
 import java.time.Instant
 import java.time.LocalDate
@@ -26,6 +27,7 @@ class ContractCollector(
     private val rawFileBatchRepository: RawFileBatchRepository,
     private val optionDailyRepository: OptionDailyRepository,
     private val optionDailyBatchRepository: OptionDailyBatchRepository,
+    private val alpacaProperties: AlpacaProperties,
     private val universeService: UniverseService,
     private val tradingCalendarService: TradingCalendarService,
     private val jobRunner: JobRunner,
@@ -36,7 +38,7 @@ class ContractCollector(
         val symbols = universeService.symbols()
         val calendar = tradingCalendarService.calendar()
         context.symbolsTotal += symbols.size
-        symbols.forEach { symbol -> jobRunner.isolated(context, symbol) { collectSymbol(context, symbol, calendar) } }
+        jobRunner.isolatedAll(context, symbols, alpacaProperties.concurrency) { symbol -> collectSymbol(context, symbol, calendar) }
     }
 
     // 한 종목씩 끊어서 트랜잭션으로 ㅂ다음
@@ -65,7 +67,7 @@ class ContractCollector(
         jobRunner.inTransaction(context) {
             rawFileBatchRepository.insertAll(files)
             val written = applyOi(symbol, contracts, context, calendar, receivedAt)
-            context.rowsWritten += written
+            synchronized(context) { context.rowsWritten += written }
         }
     }
 

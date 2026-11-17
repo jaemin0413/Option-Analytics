@@ -4,6 +4,7 @@ import com.option.domain.journal.dto.request.JournalRequest
 import com.option.domain.journal.dto.response.JournalResponse
 import com.option.domain.journal.entity.Journal
 import com.option.domain.journal.repository.JournalRepository
+import com.option.domain.journal.repository.JournalResultQueryRepository
 import com.option.domain.market.service.TradingCalendarService
 import com.option.global.apiPayLoad.error.JournalErrorCode
 import com.option.global.apiPayLoad.exception.BusinessException
@@ -15,6 +16,7 @@ import java.time.Clock
 @Service
 class JournalService(
     private val journalRepository: JournalRepository,
+    private val journalResultQueryRepository: JournalResultQueryRepository,
     private val tradingCalendarService: TradingCalendarService,
     private val clock: Clock,
 ) {
@@ -39,8 +41,11 @@ class JournalService(
         )
     }
 
-    // 최근 저널
-    fun getRecent(userId: Long, limit: Int): List<JournalResponse> =
-        journalRepository.findByUserIdOrderByTargetSessionDescSymbolAsc(userId, PageRequest.of(0, limit.coerceIn(1, 500)))
-            .map(JournalResponse::from)
+    // 최근 저널, 채점 끝난 건 결과도 같이
+    fun getRecent(userId: Long, limit: Int): List<JournalResponse> {
+        val entries = journalRepository.findByUserIdOrderByTargetSessionDescSymbolAsc(userId, PageRequest.of(0, limit.coerceIn(1, 500)))
+        val results = journalResultQueryRepository.find(userId, entries.map { it.targetSession }.toSet())
+            .associateBy { it.symbol to it.targetSession }
+        return entries.map { JournalResponse.from(it, results[it.symbol to it.targetSession]) }
+    }
 }
