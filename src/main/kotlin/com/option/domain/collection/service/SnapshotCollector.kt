@@ -13,6 +13,7 @@ import com.option.domain.market.repository.OptionDailyBatchRepository
 import com.option.domain.market.service.UniverseService
 import com.option.domain.market.vo.Feeds
 import com.option.domain.market.util.OccSymbol
+import com.option.global.properties.AlpacaProperties
 import org.springframework.stereotype.Service
 import java.time.Instant
 import java.time.LocalDate
@@ -24,6 +25,7 @@ class SnapshotCollector(
     private val rawFileStore: RawFileStore,
     private val rawFileBatchRepository: RawFileBatchRepository,
     private val optionDailyBatchRepository: OptionDailyBatchRepository,
+    private val alpacaProperties: AlpacaProperties,
     private val universeService: UniverseService,
     private val jobRunner: JobRunner,
 ) {
@@ -31,7 +33,7 @@ class SnapshotCollector(
     fun collect(context: RunContext) {
         val symbols = universeService.symbols()
         context.symbolsTotal = symbols.size
-        symbols.forEach { symbol -> jobRunner.isolated(context, symbol) { collectSymbol(context, symbol) } }
+        jobRunner.isolatedAll(context, symbols, alpacaProperties.concurrency) { symbol -> collectSymbol(context, symbol) }
     }
 
     // 종목별로 페이지 모으고 저장
@@ -56,7 +58,7 @@ class SnapshotCollector(
             rawFileBatchRepository.insertAll(files)
             optionDailyBatchRepository.insertAll(rows)
         }
-        context.rowsWritten += rows.size
+        synchronized(context) { context.rowsWritten += rows.size }
     }
 
     companion object {

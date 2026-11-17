@@ -17,6 +17,7 @@ import java.net.http.HttpTimeoutException
 import java.time.Clock
 import java.time.Duration
 import java.time.LocalDate
+import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
 
 // 작업 돌리는 코드
@@ -67,10 +68,20 @@ class JobRunner(
     fun isolated(context: RunContext, symbol: String, body: () -> Unit) {
         try {
             body()
-            context.symbolsOk++
+            synchronized(context) { context.symbolsOk++ }
         } catch (e: Exception) {
-            context.symbolsFailed++
+            synchronized(context) { context.symbolsFailed++ }
             recordFailure(context, symbol, classify(e), e.message)
+        }
+    }
+
+    // 종목들을 n개의 스레드로 나눠서 될린다
+    fun isolatedAll(context: RunContext, symbols: List<String>, threads: Int, body: (String) -> Unit) {
+        val pool = Executors.newFixedThreadPool(threads)
+        try {
+            symbols.map { symbol -> pool.submit { isolated(context, symbol) { body(symbol) } } }.forEach { it.get() }
+        } finally {
+            pool.shutdown()
         }
     }
 
