@@ -19,10 +19,12 @@ import com.option.global.apiPayLoad.error.ModelErrorCode
 import com.option.global.apiPayLoad.exception.BusinessException
 import com.option.global.properties.UniverseProperties
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
 
 // 공개된 최근 자료만 읽어 db를 안 뒤지게 함
 @Service
+@Transactional(readOnly = true)
 class DashboardService(
     private val publicationRepository: PublicationRepository,
     private val tickerDailyMetricRepository: TickerDailyMetricRepository,
