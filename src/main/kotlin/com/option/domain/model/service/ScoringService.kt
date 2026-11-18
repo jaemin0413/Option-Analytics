@@ -6,6 +6,7 @@ import com.option.domain.market.entity.StockDaily
 import com.option.domain.market.repository.StockDailyRepository
 import com.option.domain.market.service.TradingCalendarService
 import com.option.domain.market.service.UniverseService
+import com.option.domain.market.util.SessionCalendar
 import com.option.domain.model.calculator.HypothesisRules
 import com.option.domain.model.entity.Score
 import com.option.domain.model.entity.TickerDailyMetric
@@ -41,7 +42,7 @@ class ScoringService(
 ) {
     private data class Key(val publicationId: Long?, val userId: Long?, val symbol: String, val subject: String, val horizon: Horizon)
 
-    private inner class Scorer(session: LocalDate, private val prices: Map<Pair<String, LocalDate>, StockDaily>) {
+    private inner class Scorer(session: LocalDate, private val prices: Map<Pair<String, LocalDate>, StockDaily>, val calendar: SessionCalendar) {
         val session = session
         val scores = mutableListOf<Score>()
 
@@ -72,7 +73,7 @@ class ScoringService(
         val backfillIds = metrics.map { it.publicationId }.distinct()
             .filter { publicationRepository.findById(it).orElse(null)?.status == PublicationStatus.BACKFILL }
             .toSet()
-        val scorer = Scorer(session, prices)
+        val scorer = Scorer(session, prices, calendar)
 
         val signalIndex = signals.groupBy { Triple(it.publicationId, it.symbol, it.horizon) }
         metrics.forEach { metric ->
@@ -225,7 +226,7 @@ class ScoringService(
             ivSource = source,
             baseSession = base,
             targetSession = scorer.session,
-            issuedWeekday = tradingCalendarService.calendar().next(base)?.dayOfWeek?.value ?: 0,
+            issuedWeekday = scorer.calendar.next(base)?.dayOfWeek?.value ?: 0,
             prediction = prediction,
             eventDay = event,
             actualReturn = actualReturn,
