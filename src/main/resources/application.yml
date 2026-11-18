@@ -65,8 +65,8 @@ alpaca:
   # 분당 200한도
   min-call-interval: 305ms
   rate-limit-wait: 10s
-  # 3개 병렬화
-  concurrency: ${ALPACA_CONCURRENCY:3}
+  # 4개 병렬화
+  concurrency: ${ALPACA_CONCURRENCY:4}
 
 fred:
   api-key: ${FRED_API_KEY:}
