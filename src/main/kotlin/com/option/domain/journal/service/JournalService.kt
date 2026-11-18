@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
 
 @Service
+@Transactional(readOnly = true)
 class JournalService(
     private val journalRepository: JournalRepository,
     private val journalResultQueryRepository: JournalResultQueryRepository,

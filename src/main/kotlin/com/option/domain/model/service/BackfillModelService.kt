@@ -30,6 +30,7 @@ import com.option.domain.model.vo.Horizon
 import com.option.domain.model.vo.ModelVersions
 import com.option.domain.model.vo.PublicationStatus
 import org.springframework.data.domain.PageRequest
+import jakarta.persistence.EntityManager
 import org.springframework.stereotype.Service
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
@@ -49,6 +50,7 @@ class BackfillModelService(
     private val scoringService: ScoringService,
     private val universeService: UniverseService,
     private val jobRunner: JobRunner,
+    private val entityManager: EntityManager,
 ) {
     fun compute(context: RunContext) {
         val calendar = tradingCalendarService.calendar()
@@ -83,6 +85,8 @@ class BackfillModelService(
             val metrics = mutableListOf<TickerDailyMetric>()
             val allSignals = mutableListOf<HypothesisSignal>()
             for (symbol in universeService.symbols()) {
+                // 읽기만 한 엔티티가 거래일 내내 쌓이면 조회마다 자동 flush가 전부 다시 검사해서 종목이 갈수록 느려진다
+                entityManager.clear()
                 val metric = computeMetric(publication.publicationId!!, symbol, base, target, weekTarget, calendar, rate) ?: continue
                 metrics += metric
                 val signal = HypothesisRules.pcrContrarian(metric.pcrPercentile)

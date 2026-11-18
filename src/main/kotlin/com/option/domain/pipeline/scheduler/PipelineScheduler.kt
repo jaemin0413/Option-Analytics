@@ -30,8 +30,8 @@ class PipelineScheduler(
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
-    // 미국 4시반에 주식 일봉 받아오기
-    @Scheduled(cron = "0 30 16 * * MON-FRI", zone = "America/New_York")
+    // 미국 8시반에 주식 일봉 받아오기. 무료 플랜은 최근 15분 SIP를 못 보고 애프터마켓이 20시까지라 그 뒤로
+    @Scheduled(cron = "0 30 20 * * MON-FRI", zone = "America/New_York")
     fun runStockBars() = runForEtSession(stockJob)
 
     // 미국 5시에 옵션 스냅샷 받아오기
