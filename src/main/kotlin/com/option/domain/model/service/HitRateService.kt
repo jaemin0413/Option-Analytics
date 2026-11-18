@@ -5,8 +5,10 @@ import com.option.domain.model.dto.response.HitRateDailyRow
 import com.option.domain.model.dto.response.HitRateResponse
 import com.option.domain.model.repository.HitRateQueryRepository
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 
 @Service
+@Transactional(readOnly = true)
 class HitRateService(
     private val hitRateQueryRepository: HitRateQueryRepository,
 ) {
