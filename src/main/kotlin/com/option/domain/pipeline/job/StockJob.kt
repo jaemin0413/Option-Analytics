@@ -23,7 +23,7 @@ class StockJob(
     override fun run(context: RunContext) {
         val calendar = tradingCalendarService.calendar()
         val previous = calendar.prev(context.session) ?: context.session.minusDays(1)
-        stockBarCollector.collectSession(context, previous)
+        stockBarCollector.collectSession(context, previous, tradingCalendarService.closeAt(context.session))
         jobRunner.isolated(context, "SCORING") { scoringService.scoreSession(context.session) }
     }
 }
