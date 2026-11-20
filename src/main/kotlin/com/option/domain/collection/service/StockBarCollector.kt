@@ -13,6 +13,7 @@ import com.option.domain.market.repository.StockDailyRepository
 import com.option.domain.market.service.UniverseService
 import com.option.domain.market.vo.Feeds
 import org.springframework.stereotype.Service
+import java.time.Instant
 import java.time.LocalDate
 import kotlin.math.abs
 
@@ -30,14 +31,16 @@ class StockBarCollector(
     private data class Bars(val raw: Map<Pair<String, LocalDate>, JsonNode>, val adjusted: Map<Pair<String, LocalDate>, Double>)
 
     // 매일 수집하는 거
-    fun collectSession(context: RunContext, previous: LocalDate) {
+    fun collectSession(context: RunContext, previous: LocalDate, closeAt: Instant?) {
+        // 날짜만 보내면 Alpaca가 그날 뉴욕 자정까지로 읽어서, 다음 날 아침 수집이 무료 구독의 최근 SIP 제한(403)에 걸린다
+        val end = closeAt?.toString() ?: context.session.toString()
         val symbols = universeService.symbols()
         context.symbolsTotal = symbols.size
         symbols.chunked(CHUNK).forEach { chunk ->
             jobRunner.isolated(context, chunk.first() + "+") {
-                val bars = fetch(context, chunk, previous, context.session)
+                val bars = fetch(context, chunk, previous, end)
                 val drifted = jobRunner.inTransaction(context) { store(context, chunk, previous, bars) }
-                drifted.forEach { symbol -> refreshAdjusted(context, symbol, previous) }
+                drifted.forEach { symbol -> refreshAdjusted(context, symbol, end) }
             }
         }
     }
@@ -49,14 +52,14 @@ class StockBarCollector(
         context.symbolsTotal += distinct.size
         distinct.chunked(CHUNK).forEach { chunk ->
             jobRunner.isolated(context, "history:" + chunk.first() + "+") {
-                val bars = fetch(context, chunk, start, end)
+                val bars = fetch(context, chunk, start, end.toString())
                 jobRunner.inTransaction(context) { store(context, chunk, start, bars, end) }
             }
         }
     }
 
     // 종가 분리해서 저장
-    private fun fetch(context: RunContext, symbols: List<String>, start: LocalDate, end: LocalDate): Bars {
+    private fun fetch(context: RunContext, symbols: List<String>, start: LocalDate, end: String): Bars {
         val files = mutableListOf<RawFile>()
         val raw = mutableMapOf<Pair<String, LocalDate>, JsonNode>()
         val adjusted = mutableMapOf<Pair<String, LocalDate>, Double>()
@@ -64,7 +67,7 @@ class StockBarCollector(
             "symbols" to symbols.joinToString(","),
             "timeframe" to "1Day",
             "start" to start.toString(),
-            "end" to end.toString(),
+            "end" to end,
             "feed" to Feeds.SIP,
             "limit" to "10000",
         )
@@ -127,7 +130,7 @@ class StockBarCollector(
     }
 
     // 종가 달라졌으면 이력을 받아와서 수정함
-    private fun refreshAdjusted(context: RunContext, symbol: String, previous: LocalDate) {
+    private fun refreshAdjusted(context: RunContext, symbol: String, end: String) {
         val rows = stockDailyRepository.findBySymbolOrderBySessionDate(symbol)
         val first = rows.firstOrNull()?.sessionDate ?: return
         val adjusted = mutableMapOf<LocalDate, Double>()
@@ -139,7 +142,7 @@ class StockBarCollector(
                 "symbols" to symbol,
                 "timeframe" to "1Day",
                 "start" to first.toString(),
-                "end" to context.session.toString(),
+                "end" to end,
                 "feed" to Feeds.SIP,
                 "adjustment" to "all",
                 "limit" to "10000",
